@@ -1,14 +1,20 @@
-var mymap = L.map('mapid').setView([51.505, -0.09], 5);
-
-
-L.tileLayer(`https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=${API_KEY}`, {
+// Define variables for our tile layers
+let satellite_layer = L.tileLayer(`https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=${API_KEY}`, {
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-    tileSize: 512,
-    // maxZoom: 12,
-    zoomOffset: -1,
     id: 'mapbox/satellite-v9',
     accessToken: 'your.mapbox.access.token'
-}).addTo(mymap);
+});
+
+
+let grayscale_layer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+});
+
+
+let outdoor_layer = L.tileLayer('https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}{r}.png', {
+	attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+});
+
 
 
 d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson")
@@ -24,8 +30,6 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
         })
     
 // THIS IS THE CODE TO ADD CIRCLES TO EACH OF THE POINTERS:
-
-// Loop through the countries array
 
 function markerSize(magnitude) {
     return magnitude * 25000;
@@ -52,6 +56,7 @@ function markerSize(magnitude) {
     return color;
   }
 
+  let earthquakes_markers = []
 
   for (let i=0, n=earthquakes_list.length; i<n; i++){
      
@@ -65,7 +70,7 @@ function markerSize(magnitude) {
     let full_date = `${weekday}, ${month} ${day_number} ${year_of_event} at ${time_of_event}`
 
 
-
+    earthquakes_markers.push(
     L.circle([earthquakes_list[i][0],earthquakes_list[i][1]], {
         fillOpacity: 1,
         color: "black",
@@ -74,11 +79,52 @@ function markerSize(magnitude) {
         // Setting our circle's radius equal to the output of our markerSize function
         // This will make our marker's size proportionate to its population
         radius: markerSize(earthquakes_list[i][2])
-      }).bindPopup("<h1> Time of earthquake: " + full_date + "</h1> <hr> <h2>Magnitude: " + earthquakes_list[i][2] + "</h2>").addTo(mymap);
+      }).bindPopup("<h1> Time of earthquake: " + full_date + "</h1> <hr> <h2>Magnitude: " + earthquakes_list[i][2] + "</h2>")
+    )
   }
 
-})
+  // Add all the cityMarkers to a new layer group.
+// Now we can handle them as one group instead of referencing each individually
+let earthquakesLayer = L.layerGroup(earthquakes_markers);
 
+var tectonicPlates = new L.LayerGroup();
+d3.json("https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json").then(plateData=>{
+  L.geoJSON(plateData,
+    {
+      color: 'orange',
+      weight: 5
+    })
+    .addTo(tectonicPlates);
+});
+
+
+
+// Only one base layer can be shown at a time
+var baseMaps = {
+    Satellite: satellite_layer,
+    Grayscale: grayscale_layer,
+    Outdoors: outdoor_layer
+  };
+
+
+// Overlays that may be toggled on or off
+var overlayMaps = {
+    "Tectonic Plates": tectonicPlates,
+    Earthquakes: earthquakesLayer
+  };
+  
+// Create map object and set default layers
+var mymap = L.map("mapid", {
+    center: [19.42732435386946, -99.12652721189019],
+    zoom: 5,
+    layers: [satellite_layer, earthquakesLayer]
+  });
+
+ 
+  // Pass our map layers into our layer control
+  // Add the layer control to the map
+  L.control.layers(baseMaps, overlayMaps,{collapsed:false}).addTo(mymap);
+  
 
   /*Legend specific*/
   var legend = new L.control({ position: "bottomright" });
@@ -98,25 +144,9 @@ function markerSize(magnitude) {
   };
   
   legend.addTo(mymap);
-  
-  
 
 
-// .catch(e=>{
-//     console.log(e)
-// })
-
-
-// 0-1 #b7f34d
-// 1-2 #e1f34d
-// 2-3 #f3db4d
-// 3-4 #f3ba4d
-// 4-5 #f0a76b
-// 5+ #f06b6b
-
-
-
-
-
-
-
+})
+.catch(e=>{
+    console.log(e)
+})
